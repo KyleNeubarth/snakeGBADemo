@@ -9,6 +9,10 @@
 //get obj buffer ready
 OBJ_ATTR obj_buffer[128];
 
+//false = h, true = v
+bool axis = true;
+int dir = -1;
+
 INLINE OBJ_ATTR *obj_set_attr_mine(OBJ_ATTR *obj, u16 a0, u16 a1, u16 a2)
 {
 	obj->attr0= a0|ATTR0_8BPP; obj->attr1= a1; obj->attr2= a2;
@@ -22,7 +26,7 @@ struct node {
 };
 
 struct node snakeUnits[100];
-int snakelength = 1;
+int snakelength = 2;
 
 void positionUnit(struct node *n,int x, int y) {
 	n->x = x;
@@ -49,6 +53,24 @@ void spawnApple() {
 	int y = qran_range(0,20);
 	obj_set_pos(&obj_buffer[127],x*8,y*8);
 }
+bool checkCollision() {
+	for (int i=1;i<snakelength;i++) {
+		if (snakeUnits[i].x == snakeUnits[0].x && snakeUnits[i].y == snakeUnits[0].y) {
+			return true;
+		}
+	}
+	return false;
+}
+void gameOver() {
+	snakelength = 2;
+	oam_init(obj_buffer,124);
+	obj_set_attr(obj_buffer,ATTR0_SQUARE,ATTR1_SIZE_8x8,ATTR2_PALBANK(0) | 1);
+	positionUnit(snakeUnits,SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
+	addUnit();
+	spawnApple();
+	axis = true;
+	dir = -1;
+}
 
 int main() {
 
@@ -70,28 +92,20 @@ int main() {
 	struct node* head = snakeUnits;
 	positionUnit(head,SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
 	addUnit();
-	addUnit();
-	addUnit();
-	addUnit();
-	addUnit();
 
 	spawnApple();
-
-	//false = h, true = v
-	bool axis = false;
-	int dir = -1;
 
 	int pollTimer = 0;
 
 	while (true) {
 		vid_vsync();
+		key_poll();
 		if (pollTimer > 5) {
 			pollTimer = 0;
 		} else {
 			pollTimer++;
 			continue;
 		}
-		key_poll();
 
 		int h = key_tri_horz();
 		int v = key_tri_vert();
@@ -114,15 +128,32 @@ int main() {
 
 		if (head->x<0) {
 			head->x=0;
+			gameOver();
 		} else if (head->x > 8*29) {
 			head->x = 8*29;
+			gameOver();
 		}
 
 		if (head->y<0) {
 			head->y=0;
+			gameOver();
 		} else if (head->y > 8*19) {
 			head->y = 8*19;
+			gameOver();
 		}
+
+		if (checkCollision()) {
+			gameOver();
+		}
+
+		int appleX = BFN_GET(obj_buffer[127].attr1, ATTR1_X);
+		int appleY = BFN_GET(obj_buffer[127].attr0, ATTR0_Y);
+
+		if (head->x == appleX && head->y == appleY) {
+			addUnit();
+			spawnApple();
+		}
+
 		obj_set_pos(obj_buffer,head->x,head->y);
 		oam_copy(oam_mem, obj_buffer, 128);
 	}
